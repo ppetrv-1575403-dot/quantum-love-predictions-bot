@@ -1,2 +1,2 @@
-# quantum-love-pedictions-bot
+# quantum-love-predictions-bot
 Telegram bot for love predictions using Quantum RNG
