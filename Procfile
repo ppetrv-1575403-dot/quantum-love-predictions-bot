@@ -1,0 +1,1 @@
+web: python coin_bot.py
