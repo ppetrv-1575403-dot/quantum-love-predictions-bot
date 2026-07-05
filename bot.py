@@ -229,13 +229,11 @@ async def send_stats_callback(query) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode="Markdown")
 
-
 # ===== WEBHOOK HTTP-СЕРВЕР =====
 
 async def health_handler(request: web.Request) -> web.Response:
     """Health check endpoint для Render."""
     return web.Response(text="OK 💝", status=200)
-
 
 async def webhook_handler(request: web.Request) -> web.Response:
     """Обработка входящих обновлений от Telegram."""
@@ -254,7 +252,6 @@ async def webhook_handler(request: web.Request) -> web.Response:
     except Exception as e:
         logger.error(f"❌ Ошибка обработки update: {e}")
         return web.Response(status=500)
-
 
 # ===== ЗАПУСК =====
 
@@ -303,7 +300,6 @@ async def on_startup(app: web.Application) -> None:
     print("=" * 50 + "\n")
     print("✅ Бот готов принимать обновления!\n")
 
-
 async def on_shutdown(app: web.Application) -> None:
     """Действия при остановке HTTP-сервера."""
     print("\n💔 Завершение работы...")
@@ -321,7 +317,6 @@ async def on_shutdown(app: web.Application) -> None:
 
     await qrng.close()
     print("🧹 Ресурсы освобождены")
-
 
 def create_web_app() -> web.Application:
     """Создание aiohttp веб-приложения."""
