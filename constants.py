@@ -170,6 +170,7 @@ def get_compatibility_data(compatibility):
         stars = get_stars_str(5)
         verdict = "Идеальная пара! Звезды благословляют ваш союз!"
         emoji = "💑"
+    if compatibility > 60:
         stars = get_stars_str(4)
         verdict = "Отличная совместимость! У вас большое будущее!"
         emoji = "💕"
