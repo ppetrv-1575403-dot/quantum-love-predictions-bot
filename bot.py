@@ -16,9 +16,14 @@ load_dotenv()
 BOT_TOKEN = os.environ["TG_BOT_TOKEN"]
 
 # ===== Webhook конфигурация =====
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")       # https://your-app.onrender.com
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL",
+    os.environ.get("RENDER_EXTERNAL_URL", "")
+)
+
 SECRET_TOKEN = os.environ.get("TELEGRAM_SECRET_TOKEN", "")  # опциональная защита
+
 PORT = int(os.environ.get("PORT", 8080))
+HOST = "0.0.0.0"
 
 from constants import (
     LOVE_PREDICTIONS, logger, love_keywords, get_stars_str,
@@ -349,7 +354,7 @@ def main() -> None:
 
     # Создаём и запускаем веб-сервер
     app = create_web_app()
-    web.run_app(app, host="0.0.0.0", port=PORT)
+    web.run_app(app, host=HOST, port=PORT)
 
 
 if __name__ == "__main__":
