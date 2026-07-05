@@ -37,7 +37,6 @@ qrng = CachedQuantumGenerator(cache_size=500, preload_threshold=0.3)
 # Глобальная ссылка на application
 application: Application = None
 
-
 # ===== ОБРАБОТЧИКИ КОМАНД =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

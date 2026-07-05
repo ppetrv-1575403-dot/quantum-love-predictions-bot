@@ -1,1 +1,1 @@
-web: python coin_bot.py
+web: python bot.py
