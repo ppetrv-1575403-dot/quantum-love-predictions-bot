@@ -16,14 +16,9 @@ load_dotenv()
 BOT_TOKEN = os.environ["TG_BOT_TOKEN"]
 
 # ===== Webhook конфигурация =====
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL",
-    os.environ.get("RENDER_EXTERNAL_URL", "")
-)
-
-SECRET_TOKEN = os.environ.get("TELEGRAM_SECRET_TOKEN", "")  # опциональная защита
-
+WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
+SECRET_TOKEN = os.environ.get("TELEGRAM_SECRET_TOKEN", "")
 PORT = int(os.environ.get("PORT", 8080))
-HOST = "0.0.0.0"
 
 from constants import (
     LOVE_PREDICTIONS, logger, love_keywords, get_stars_str,
@@ -33,12 +28,13 @@ from constants import (
     compatibility_info_str, about_info_str, get_last_refill_str,
     get_prediction_response_str, get_love_prediction_response_str
 )
+
 from cached_quantum_rng import CachedQuantumGenerator
 
 # ===== ГЛОБАЛЬНЫЙ ГЕНЕРАТОР =====
 qrng = CachedQuantumGenerator(cache_size=500, preload_threshold=0.3)
 
-# Глобальная ссылка на application (нужна для webhook handler)
+# Глобальная ссылка на application
 application: Application = None
 
 
@@ -88,7 +84,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     status = fill_status_str(fill)
     last_refill = stats['last_refill']
     last_refill_str = get_last_refill_str(last_refill)
-    
+
     stats_text = stats_text_str(stats, status, last_refill_str)
 
     keyboard = [[InlineKeyboardButton("💘 Гадание на любовь", callback_data="love")]]
@@ -125,7 +121,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if any(word in text for word in love_keywords):
         await send_love_prediction(update.message, update.effective_user)
     else:
-        # Если непонятно — даем любовное гадание по умолчанию
         await send_love_prediction(update.message, update.effective_user)
 
 
@@ -229,15 +224,16 @@ async def send_stats_callback(query) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode="Markdown")
 
+
 # ===== WEBHOOK HTTP-СЕРВЕР =====
 
 async def health_handler(request: web.Request) -> web.Response:
     """Health check endpoint для Render."""
     return web.Response(text="OK 💝", status=200)
 
+
 async def webhook_handler(request: web.Request) -> web.Response:
     """Обработка входящих обновлений от Telegram."""
-    # Проверка secret token (дополнительная защита)
     if SECRET_TOKEN:
         header_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
         if header_secret != SECRET_TOKEN:
@@ -253,6 +249,7 @@ async def webhook_handler(request: web.Request) -> web.Response:
         logger.error(f"❌ Ошибка обработки update: {e}")
         return web.Response(status=500)
 
+
 # ===== ЗАПУСК =====
 
 async def on_startup(app: web.Application) -> None:
@@ -261,13 +258,10 @@ async def on_startup(app: web.Application) -> None:
 
     print("💝 Инициализация Любовного Оракула...")
 
-    # Инициализируем квантовый кеш
     await qrng.initialize_cache()
 
-    # Создаём и настраиваем PTB Application
     application = Application.builder().token(BOT_TOKEN).build()
 
-    # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("love", love_command))
     application.add_handler(CommandHandler("compatibility", compatibility_command))
@@ -276,11 +270,9 @@ async def on_startup(app: web.Application) -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Инициализируем PTB (это инициализирует bot для set_webhook)
     await application.initialize()
     await application.start()
 
-    # Устанавливаем webhook в Telegram
     full_webhook_url = f"{WEBHOOK_URL}/{BOT_TOKEN}"
     webhook_kwargs = {"url": full_webhook_url, "allowed_updates": Update.ALL_TYPES}
     if SECRET_TOKEN:
@@ -300,34 +292,54 @@ async def on_startup(app: web.Application) -> None:
     print("=" * 50 + "\n")
     print("✅ Бот готов принимать обновления!\n")
 
+
 async def on_shutdown(app: web.Application) -> None:
     """Действия при остановке HTTP-сервера."""
     print("\n💔 Завершение работы...")
 
-    if application:
-        # Удаляем webhook
+    try:
+        if application:
+            # Удаляем webhook
+            try:
+                await application.bot.delete_webhook()
+                print("✅ Webhook удалён")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось удалить webhook: {e}")
+
+            # Останавливаем application
+            try:
+                await application.stop()
+                print("✅ Application остановлена")
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка при остановке application: {e}")
+
+            try:
+                await application.shutdown()
+                print("✅ Application shutdown завершён")
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка при shutdown application: {e}")
+
+        # Закрываем генератор
         try:
-            await application.bot.delete_webhook()
-            print("✅ Webhook удалён")
+            await qrng.close()
+            print("✅ Квантовый генератор закрыт")
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось удалить webhook: {e}")
+            logger.warning(f"⚠️ Ошибка при закрытии генератора: {e}")
 
-        await application.stop()
-        await application.shutdown()
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка при shutdown: {e}")
 
-    await qrng.close()
     print("🧹 Ресурсы освобождены")
+
 
 def create_web_app() -> web.Application:
     """Создание aiohttp веб-приложения."""
     app = web.Application()
 
-    # Маршруты
     app.router.add_get("/", health_handler)
     app.router.add_get("/health", health_handler)
     app.router.add_post(f"/{BOT_TOKEN}", webhook_handler)
 
-    # Хуки запуска/остановки
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
 
@@ -336,7 +348,6 @@ def create_web_app() -> web.Application:
 
 def main() -> None:
     """Точка входа."""
-    # Проверка обязательных переменных
     if not BOT_TOKEN:
         print("❌ TG_BOT_TOKEN не установлен в переменных окружения!")
         sys.exit(1)
@@ -344,12 +355,39 @@ def main() -> None:
     if not WEBHOOK_URL:
         print("❌ WEBHOOK_URL не установлен!")
         print("💡 Установите переменную окружения WEBHOOK_URL")
-        print("   Например: https://quantum-love-predictions-bot.onrender.com")
         sys.exit(1)
 
-    # Создаём и запускаем веб-сервер
     app = create_web_app()
-    web.run_app(app, host=HOST, port=PORT)
+    
+    # Используем loop.run_until_complete для лучшего контроля
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        loop.run_until_complete(web._run_app(
+            app,
+            host="0.0.0.0",
+            port=PORT,
+            shutdown_timeout=10.0  # Даём время на graceful shutdown
+        ))
+    except KeyboardInterrupt:
+        print("\n💔 Получен сигнал остановки")
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Отменяем все оставшиеся задачи
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        
+        # Ждём завершения отменённых задач
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        
+        loop.close()
+        print("✅ Event loop закрыт")
 
 
 if __name__ == "__main__":

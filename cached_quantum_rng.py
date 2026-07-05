@@ -180,14 +180,22 @@ class CachedQuantumGenerator:
                 **self.stats
             }
     
-    async def close(self) -> None:
-        """Закрытие генератора."""
-        if self._background_task:
-            self._background_task.cancel()
-            try:
-                await self._background_task
-            except asyncio.CancelledError:
-                pass
+    async def close(self):
+        """Закрытие генератора и всех ресурсов."""
+        try:
+            # Отменяем все фоновые задачи
+            if hasattr(self, '_background_tasks'):
+                for task in self._background_tasks:
+                if not task.done():
+                    task.cancel()
+            
+                # Ждём завершения
+                if self._background_tasks:
+                    await asyncio.gather(*self._background_tasks, return_exceptions=True)
         
-        if self._session and not self._session.closed:
-            await self._session.close()
+            # Закрываем aiohttp session
+            if hasattr(self, 'session') and self.session:
+                await self.session.close()
+            
+        except Exception as e:
+            logger.warning(f"Ошибка при закрытии генератора: {e}")
