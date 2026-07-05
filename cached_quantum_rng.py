@@ -186,8 +186,8 @@ class CachedQuantumGenerator:
             # Отменяем все фоновые задачи
             if hasattr(self, '_background_tasks'):
                 for task in self._background_tasks:
-                if not task.done():
-                    task.cancel()
+                    if not task.done():
+                        task.cancel()
             
                 # Ждём завершения
                 if self._background_tasks:
